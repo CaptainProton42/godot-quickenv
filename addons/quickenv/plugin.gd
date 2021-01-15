@@ -19,6 +19,7 @@ enum MenuOption {
 
 func _enter_tree():
 	connect("scene_changed", self, "_on_scene_changed")
+	get_tree().connect("node_added", self, "_on_node_added")
 	
 	_file_dialog.add_filter("*.tscn, *.scn; Scenes")
 	_file_dialog.mode = _file_dialog.MODE_OPEN_FILE
@@ -41,6 +42,9 @@ func _enter_tree():
 	_button.get_popup().set_item_disabled(_button.get_popup().get_item_index(MenuOption.MENU_ENABLE), true)
 
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, _button)
+
+	if _scene_is_empty():
+		_disable_menu()
 
 func _exit_tree():
 	remove_control_from_container(CONTAINER_SPATIAL_EDITOR_MENU, _button)
@@ -109,25 +113,24 @@ func _load_environment(path):
 		_add_environment()
 
 func _on_scene_changed(_scene_root):
-	if _has_scene_loaded():
-		if not _has_environment():
-			_button.get_popup().set_item_checked(_button.get_popup().get_item_index(MenuOption.MENU_ENABLE), false)
-			_reload_resource()
-
-		if _scene_is_environment() or _scene_is_empty():
-			_disable_menu()
-			if _has_environment():
-				_restore_enabled = true
-				_remove_environment()
-		else:
-			_enable_menu()
+	if _scene_is_environment() or _scene_is_empty():
+		_disable_menu()
+		if _has_environment():
+			_restore_enabled = true
+			_remove_environment()
+	else:
+		_enable_menu()
+		if _has_scene_loaded():
 			if _has_environment():
 				_remove_environment()
 				_reload_resource()
 				_add_environment()
-			if _restore_enabled:
-				_restore_enabled = false
-				_add_environment()
+			else:
+				_reload_resource()
+				if _restore_enabled:
+					_restore_enabled = false
+					_add_environment()
+
 
 func _remove_environment():
 	_instance.get_parent().remove_child(_instance)
@@ -154,7 +157,7 @@ func _has_scene_loaded():
 
 func _scene_is_environment():
 	var scene_root = get_editor_interface().get_edited_scene_root()
-	return scene_root != null and scene_root.filename == _scene.resource_path
+	return _has_scene_loaded() and scene_root != null and scene_root.filename == _scene.resource_path
 
 func _scene_is_empty():
 	return get_editor_interface().get_edited_scene_root() == null
@@ -164,3 +167,10 @@ func _disable_menu():
 
 func _enable_menu():
 	_button.disabled = false
+
+func _on_node_added(node):
+	if node == get_editor_interface().get_edited_scene_root():
+		_enable_menu()
+		if _restore_enabled:
+			_restore_enabled = false
+			_add_environment()
